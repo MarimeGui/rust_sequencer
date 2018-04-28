@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["guillaume <lepro.guillaume@gmail.com>"]
 
 [dependencies]
+pcm = { git = "https://github.com/MarimeGui/pcm_rust.git" }
