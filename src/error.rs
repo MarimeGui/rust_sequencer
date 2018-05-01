@@ -2,12 +2,18 @@ use pcm::error::PCMError;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result};
 
+/// The main error type. Everything in this library that returns an error will return this type.
 #[derive(Debug)]
 pub enum SequencerError {
+    /// An error originating from the PCM Library
     PCMError(PCMError),
+    /// If no key is available and no custom KeyGenerator is provided
     NoDefaultKeyGiven,
+    /// If a float given to use as a TIme or a Frequency is not a normal number and strictly superior to zero
     ImpossibleTimeOrFrequency(f64),
+    /// If there is no frequency associated with an ID in a FrequencyLookupTable
     NoFrequencyForID(u32),
+    /// If there is no instrument associated with an ID in a InstrumentTable
     NoInstrumentForID(u16),
 }
 

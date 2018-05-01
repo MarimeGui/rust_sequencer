@@ -14,7 +14,8 @@
 
 extern crate pcm;
 
-mod error;
+/// Contains all errors for this Library
+pub mod error;
 
 use error::SequencerError;
 use pcm::{PCMParameters, PCM};
@@ -84,6 +85,7 @@ pub struct Note {
 
 /// Used to provide indexes for float values, along with error checking and easy conversion between different formats
 pub struct FrequencyLookupTable {
+    /// HashMap used to get a frequency from a float
     pub lut: HashMap<u32, f64>,
 }
 
@@ -150,9 +152,11 @@ pub trait Envelope {
 }
 
 impl MusicSequencer {
+    /// Runs everything and gives the final PCM
     pub fn render(&self) -> PCM {
         unimplemented!();
     }
+    /// Generates all frequencies needed for processing
     pub fn gen_instrument_keys(&mut self) -> Result<()> {
         for (instrument_id, frequencies) in &self.sequence.list_frequencies_for_instruments() {
             let instrument = self.instruments.get(instrument_id)?;
@@ -163,10 +167,12 @@ impl MusicSequencer {
 }
 
 impl Sequence {
+    /// Sorts all Notes in the sequence by time
     pub fn sort_by_time(&mut self) {
         self.notes
             .sort_by(|a, b| a.start_at.partial_cmp(&b.start_at).unwrap()); // Hopefully nobody decides to put NaNs in the data :)
     }
+    /// Calculates the maximum amount of notes that will be played at once throughout the entire sequence
     pub fn calc_max_notes_at_once(&mut self) -> u32 {
         if self.notes.is_empty() {
             return 0;
@@ -193,6 +199,7 @@ impl Sequence {
         }
         max_notes_at_once
     }
+    /// Generates a HashMap containing what frequencies each instrument will be playing
     pub fn list_frequencies_for_instruments(&self) -> HashMap<u16, Vec<u32>> {
         let mut frequencies_used_by_instruments = HashMap::new();
         for note in &self.notes {
@@ -208,6 +215,7 @@ impl Sequence {
 }
 
 impl FrequencyLookupTable {
+    /// Returns a Frequency for an ID if it exists, otherwise returns an error.
     pub fn get(&self, id: &u32) -> Result<&f64> {
         match self.lut.get(id) {
             Some(v) => {
@@ -220,6 +228,7 @@ impl FrequencyLookupTable {
 }
 
 impl InstrumentTable {
+    /// Returns an Instrument from the list from an ID, returns an error if there is no instrument at specified ID
     pub fn get(&mut self, id: &u16) -> Result<&mut Instrument> {
         match self.instruments.get_mut(id) {
             Some(i) => Ok(i),
@@ -229,6 +238,11 @@ impl InstrumentTable {
 }
 
 impl Instrument {
+    /// Generates keys with specified frequencies and adds the new keys to the Instrument.
+    /// # Arguments
+    /// * frequency_ids: The frequency IDs to generate
+    /// * f_lut: The FrequencyLookupTable to use for getting an actual frequency from an ID
+    /// * parameters: PCM parameters to use when generating new keys
     pub fn gen_keys(
         &mut self,
         frequency_ids: &[u32],
@@ -258,6 +272,7 @@ impl Instrument {
         }
         Ok(())
     }
+    /// Returns any first key that is available, used for the pitch changer.
     pub fn get_any_key(&self) -> Result<&Key> {
         Ok(match self.keys.values().next() {
             Some(v) => v,
