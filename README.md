@@ -2,4 +2,4 @@
 
 A library for sequencing music in Rust
 
-Useless for now...
+I need to write the documentation for it, but it is functional to a certain degree !!
