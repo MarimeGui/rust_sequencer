@@ -15,7 +15,6 @@
 // Todo: Implement Panning
 //       Make a trait that replaces the FLUT
 //       Process other types of data than f32
-//       Merge Hardware and Software helpers
 //       Move the ValidTimeFrequency error to it's own error type
 //       Implement looping
 //       Track volume in helper
@@ -27,8 +26,8 @@
 //       Check for overflows everywhere
 //       Remove all unimplemented!()
 //       Add errors for all panics!() and everything that should be checked in general
-//       Make a new mod for different pre-made Key Generators
 //       Make the user pass the Pitch changer rather than implying it if None
+//       Integrate a Tempo Helper and a tick counter in helper
 
 extern crate pcm;
 

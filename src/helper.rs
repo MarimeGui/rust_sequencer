@@ -4,34 +4,25 @@ use {FrequencyLookupTable, Note, Sequence};
 
 /// Represents a Note missing some information
 #[derive(Clone)]
-pub struct HardwarePartialNote {
+pub struct PartialNote {
     pub start_at: f64,
     pub on_velocity: f64,
 }
 
-/// Helps creating a Sequence and a FrequencyLookupTable from another type of sequence that is Hardware-Oriented (like MIDI)
+/// Helps creating a Sequence and a FrequencyLookupTable from another type of sequence
 #[derive(Default)]
-pub struct HardwareSequenceHelper {
-    pub current_instruments: HashMap<usize, HashMap<usize, HardwarePartialNote>>,
+pub struct SequenceHelper {
+    pub current_instruments: HashMap<usize, HashMap<usize, PartialNote>>,
     pub frequency_lut: Option<FrequencyLookupTable>,
     pub frequency_lut_builder: Option<Vec<f64>>,
     pub sequence: Sequence,
     pub at_time: f64,
 }
 
-/// Just like HardwareSequenceHelper but for Software-Oriented sequences
-#[derive(Default)]
-pub struct SoftwareSequenceHelper {
-    pub sequence: Sequence,
-    pub frequency_lut: Option<FrequencyLookupTable>,
-    pub frequency_lut_builder: Option<Vec<f64>>,
-    pub at_time: f64,
-}
-
-impl HardwareSequenceHelper {
+impl SequenceHelper {
     /// Creates a new empty HardwareSequenceHelper
-    pub fn new() -> HardwareSequenceHelper {
-        HardwareSequenceHelper {
+    pub fn new() -> SequenceHelper {
+        SequenceHelper {
             current_instruments: HashMap::new(),
             frequency_lut: None,
             frequency_lut_builder: Some(Vec::new()),
@@ -40,8 +31,8 @@ impl HardwareSequenceHelper {
         }
     }
     /// Creates a new empty HardwareSequenceHelper with a already existing FLUT
-    pub fn new_with_flut(frequency_lut: FrequencyLookupTable) -> HardwareSequenceHelper {
-        HardwareSequenceHelper {
+    pub fn new_with_flut(frequency_lut: FrequencyLookupTable) -> SequenceHelper {
+        SequenceHelper {
             current_instruments: HashMap::new(),
             frequency_lut: Some(frequency_lut),
             frequency_lut_builder: None,
@@ -86,7 +77,7 @@ impl HardwareSequenceHelper {
             None => {
                 freq_hashmap.insert(
                     frequency_id,
-                    HardwarePartialNote {
+                    PartialNote {
                         start_at: self.at_time,
                         on_velocity,
                     },
@@ -144,55 +135,6 @@ impl HardwareSequenceHelper {
             None => panic!("No instrument for ID"),
         }
     }
-    /// Returns the built FrequencyLookupTable
-    pub fn get_frequency_lut(&self) -> FrequencyLookupTable {
-        match self.frequency_lut {
-            Some(ref f) => f.clone(),
-            None => match self.frequency_lut_builder {
-                Some(ref fc) => {
-                    let mut lut = HashMap::new();
-                    for (index, value) in fc.iter().enumerate() {
-                        lut.insert(index, value.clone());
-                    }
-                    FrequencyLookupTable { lut }
-                }
-                None => panic!("Deserved for not using the correct function !"),
-            },
-        }
-    }
-    /// Returns the built sequence
-    pub fn get_sequence(&self) -> Sequence {
-        self.sequence.clone()
-    }
-}
-
-impl SoftwareSequenceHelper {
-    /// Creates a new empty SoftwareSequenceHelper
-    pub fn new() -> SoftwareSequenceHelper {
-        SoftwareSequenceHelper {
-            sequence: Sequence::new(),
-            frequency_lut: None,
-            frequency_lut_builder: Some(Vec::new()),
-            at_time: 0f64,
-        }
-    }
-    /// Like new() but with a pre-existing FLUT
-    pub fn new_with_flut(frequency_lut: FrequencyLookupTable) -> SoftwareSequenceHelper {
-        SoftwareSequenceHelper {
-            sequence: Sequence::new(),
-            frequency_lut: Some(frequency_lut),
-            frequency_lut_builder: None,
-            at_time: 0f64,
-        }
-    }
-    /// Make time go forward by a certain amount in seconds
-    pub fn time_forward(&mut self, time_passed: f64) {
-        self.at_time += time_passed;
-    }
-    /// Resets the time to 0
-    pub fn reset_time(&mut self) {
-        self.at_time = 0f64;
-    }
     /// Adds a new note to the sequence
     pub fn new_note(
         &mut self,
@@ -239,11 +181,11 @@ impl SoftwareSequenceHelper {
             instrument_id,
         });
     }
-    /// Returns the Sequence
+    /// Returns the built sequence
     pub fn get_sequence(&self) -> Sequence {
         self.sequence.clone()
     }
-    /// Returns the built FLUT
+    /// Returns the built FrequencyLookupTable
     pub fn get_frequency_lut(&self) -> FrequencyLookupTable {
         match self.frequency_lut {
             Some(ref f) => f.clone(),
