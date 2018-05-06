@@ -8,9 +8,9 @@
 //!
 //! * The Sequencer uses a Sequence and Instruments to 'play'.
 //! * A Sequence is composed of notes with specific parameters.
-//! * Instruments are composed of Keys, each of these have a different frequency.
-//! * A Note is something placed in a Sequence that describes when and how to make a sound.
-//! * A Key is a sound for a particular frequency that an instrument makes.
+//! * Instruments are composed of Keys, each of these have a different pitch.
+//! * A Note is something placed in a Sequence that describes when to make a sound and at which pitch
+//! * A Key is a sound for a particular pitch that an instrument makes.
 
 // Todo: Implement Panning
 //       Make a trait that replaces the FLUT
@@ -28,6 +28,7 @@
 //       Remove all unimplemented!()
 //       Add errors for all panics!() and everything that should be checked in general
 //       Make a new mod for different pre-made Key Generators
+//       Make the user pass the Pitch changer rather than implying it if None
 
 extern crate pcm;
 
@@ -149,11 +150,12 @@ pub struct Key {
 
 /// Used for generating a new key for a particular frequency
 pub trait KeyGenerator {
-    /// Generates a new key for an instrument. A generated key must be 1 period long (= (1 / Frequency) seconds)
+    /// Generates a new key for an instrument
     /// # Arguments
     /// * frequency - The height that this key should produce
     /// * parameters - PCM Parameters to respect for the output
-    fn key_gen(&self, frequency: &f64, parameters: &PCMParameters) -> Key;
+    /// * duration - The ideal length of the output PCM. It can be ignored if necessary
+    fn key_gen(&self, frequency: &f64, parameters: &PCMParameters, duration: &f64) -> Key;
 }
 
 /// Changes the pitch of an already existing key for crating the others, fallback if there is nothing else to use.
@@ -295,15 +297,23 @@ impl Sequence {
         }
         max_notes
     }
-    /// Generates a HashMap containing what frequencies each instrument will be playing
-    pub fn list_frequencies_for_instruments(&self) -> HashMap<usize, Vec<usize>> {
+    /// Generates a HashMap containing what frequencies each instrument will be playing and for how long
+    pub fn list_frequencies_for_instruments(&self) -> HashMap<usize, Vec<(usize, f64)>> {
         let mut frequencies_used_by_instruments = HashMap::new();
         for note in &self.notes {
-            let frequencies = frequencies_used_by_instruments
+            let frequencies_times = frequencies_used_by_instruments
                 .entry(note.instrument_id)
                 .or_insert_with(Vec::new);
-            if !(frequencies.contains(&note.frequency_id)) {
-                frequencies.push(note.frequency_id);
+            match frequencies_times.iter().position(|x: &(usize, f64)| x.0 == note.frequency_id) {
+                None => frequencies_times.push((note.frequency_id, note.duration)),
+                Some(id) => {
+                    let ft = frequencies_times.get_mut(id).unwrap();
+                    ft.1 = if ft.1 > note.duration {
+                        ft.1
+                    } else {
+                        note.duration
+                    }
+                }
             }
         }
         frequencies_used_by_instruments
@@ -359,21 +369,21 @@ impl InstrumentTable {
 impl Instrument {
     /// Generates keys with specified frequencies and adds the new keys to the Instrument.
     /// # Arguments
-    /// * frequency_ids: The frequency IDs to generate
+    /// * frequency_ids_durations: The frequency IDs to generate along with the amount of time needed
     /// * f_lut: The FrequencyLookupTable to use for getting an actual frequency from an ID
     /// * parameters: PCM parameters to use when generating new keys
     pub fn gen_keys(
         &mut self,
-        frequency_ids: &[usize],
+        frequency_ids_durations: &[(usize, f64)],
         f_lut: &FrequencyLookupTable,
         parameters: &PCMParameters,
     ) -> Result<()> {
         match self.key_generator {
             Some(ref g) => {
-                for frequency_id in frequency_ids {
+                for frequency_id in frequency_ids_durations {
                     self.keys.insert(
-                        frequency_id.clone(),
-                        g.key_gen(f_lut.get(frequency_id)?, parameters),
+                        frequency_id.0,
+                        g.key_gen(f_lut.get(&frequency_id.0)?, parameters, &frequency_id.1),
                     );
                 }
             }
@@ -381,10 +391,10 @@ impl Instrument {
                 let pitch_changer = KeyPitchChanger {
                     original_key: self.get_any_key()?.clone(),
                 };
-                for frequency_id in frequency_ids {
+                for frequency_id in frequency_ids_durations {
                     self.keys.insert(
-                        frequency_id.clone(),
-                        pitch_changer.key_gen(f_lut.get(frequency_id)?, parameters),
+                        frequency_id.0,
+                        pitch_changer.key_gen(f_lut.get(&frequency_id.0)?, parameters, &frequency_id.1),
                     );
                 }
             }
@@ -436,29 +446,36 @@ impl Instrument {
 }
 
 impl KeyGenerator for KeyPitchChanger {
-    fn key_gen(&self, _frequency: &f64, _parameters: &PCMParameters) -> Key {
+    fn key_gen(&self, _frequency: &f64, _parameters: &PCMParameters, _duration: &f64) -> Key {
         unimplemented!("Cannot change the pitch of a Key for now")
     }
 }
 
 impl KeyGenerator for SquareWaveGenerator {
-    fn key_gen(&self, frequency: &f64, parameters: &PCMParameters) -> Key {
+    fn key_gen(&self, frequency: &f64, parameters: &PCMParameters, duration: &f64) -> Key {
         match parameters.sample_type {
             Sample::Float(_) => {
-                let nb_samples = (f64::from(parameters.sample_rate) / frequency).round() as u64;
-                let half_period = nb_samples / 2;
+                let sample_rate = f64::from(parameters.sample_rate);  // In Hertz
+                let sample_rate_period = sample_rate.recip();  // In Seconds
+                let nb_samples = sample_rate * duration;  // In number of samples
+                let note_period = frequency.recip();  // In seconds
+                let half_note_period = note_period / 2f64;  // In seconds
                 let mut frames = Vec::new();
-                for i in 0..nb_samples {
+                let mut pos_sample = 0f64;  // In number of samples
+                let mut pos_seconds = 0f64;  // In seconds
+                while pos_sample < nb_samples {
                     let mut samples = Vec::new();
-                    if i < half_period {
+                    if (pos_seconds % note_period) <= half_note_period {
                         for _ in 0..parameters.nb_channels {
                             samples.push(Sample::Float(1f32));
                         }
-                    } else if i >= half_period {
+                    } else {
                         for _ in 0..parameters.nb_channels {
                             samples.push(Sample::Float(-1f32));
                         }
                     }
+                    pos_sample += 1f64;
+                    pos_seconds += sample_rate_period;
                     frames.push(Frame { samples });
                 }
                 Key {

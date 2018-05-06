@@ -120,15 +120,19 @@ impl HardwareSequenceHelper {
             Some(i) => {
                 match i.get(&frequency_id) {
                     Some(pn) => {
-                        self.sequence.add_note(Note {
-                            start_at: pn.start_at,
-                            end_at: self.at_time,
-                            duration: self.at_time - pn.start_at,
-                            frequency_id,
-                            on_velocity: pn.on_velocity,
-                            off_velocity,
-                            instrument_id,
-                        });
+                        if (self.at_time - pn.start_at) > 0f64 {
+                            self.sequence.add_note(Note {
+                                start_at: pn.start_at,
+                                end_at: self.at_time,
+                                duration: self.at_time - pn.start_at,
+                                frequency_id,
+                                on_velocity: pn.on_velocity,
+                                off_velocity,
+                                instrument_id,
+                            });
+                        } else if (self.at_time - pn.start_at) < 0f64 {
+                            panic!("A note has a negative duration");
+                        }
                         to_remove = true;
                     }
                     None => {}
