@@ -28,6 +28,9 @@
 //       Add errors for all panics!() and everything that should be checked in general
 //       Make the user pass the Pitch changer rather than implying it if None
 //       Integrate a Tempo Helper and a tick counter in helper
+//       Allow for global volume control
+//       Prevent clicking by multiplying last values of each note
+//       New Tone Generators
 
 extern crate pcm;
 
@@ -155,7 +158,9 @@ pub trait KeyGenerator {
     /// # Arguments
     /// * frequency - The height that this key should produce
     /// * parameters - PCM Parameters to respect for the output
-    /// * duration - The ideal length of the output PCM. It can be ignored if necessary
+    /// * duration - The longest time this key will be held for.
+    /// This is useful if the generator needs to know how long it needs to run to create a good sound.
+    /// Can be completely ignored.
     fn key_gen(&self, frequency: &f64, parameters: &PCMParameters, duration: &f64) -> Key;
 }
 
